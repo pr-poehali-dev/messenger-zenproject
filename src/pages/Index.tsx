@@ -16,6 +16,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 const EMOJI_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👀', '✨'];
 
@@ -50,6 +56,8 @@ export default function Index() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newChatName, setNewChatName] = useState('');
   const [isNewChatGroup, setIsNewChatGroup] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reactionPopover, setReactionPopover] = useState<number | null>(null);
 
   const handleSendMessage = () => {
     if (!messageInput.trim() || !selectedChat) return;
@@ -67,6 +75,22 @@ export default function Index() {
     }]);
     
     setMessageInput('');
+  };
+
+  const handleAddReaction = (messageId: number, emoji: string) => {
+    setMessages(messages.map(msg => {
+      if (msg.id === messageId) {
+        const hasReaction = msg.reactions.includes(emoji);
+        return {
+          ...msg,
+          reactions: hasReaction 
+            ? msg.reactions.filter(r => r !== emoji)
+            : [...msg.reactions, emoji]
+        };
+      }
+      return msg;
+    }));
+    setReactionPopover(null);
   };
 
   const handleCreateChat = () => {
@@ -90,9 +114,8 @@ export default function Index() {
     setMessages([]);
   };
 
-  return (
-    <div className="flex h-screen bg-background dark">
-      <aside className="w-[320px] bg-sidebar border-r border-sidebar-border flex flex-col animate-slide-in">
+  const SidebarContent = () => (
+    <div className="h-full bg-sidebar flex flex-col">
         <div className="p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-sidebar-foreground">Messenger</h1>
@@ -355,11 +378,29 @@ export default function Index() {
             )}
           </div>
         </ScrollArea>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-background dark">
+      <aside className="hidden lg:flex w-[320px] border-r border-sidebar-border animate-slide-in">
+        <SidebarContent />
       </aside>
 
       <main className="flex-1 flex flex-col animate-fade-in">
         {!selectedChat ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="lg" className="lg:hidden mb-6">
+                  <Icon name="Menu" size={20} className="mr-2" />
+                  Открыть чаты
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[320px]">
+                <SidebarContent />
+              </SheetContent>
+            </Sheet>
             <div className="mb-8">
               <div className="flex items-center justify-center mb-6">
                 <div className="bg-primary rounded-full p-6">
@@ -384,7 +425,17 @@ export default function Index() {
           </div>
         ) : (
           <>
-            <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card">
+            <header className="h-16 border-b border-border flex items-center justify-between px-4 lg:px-6 bg-card">
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden mr-2">
+                    <Icon name="Menu" size={20} />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-[320px]">
+                  <SidebarContent />
+                </SheetContent>
+              </Sheet>
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className={selectedChat.isGroup ? 'bg-primary text-primary-foreground' : 'bg-primary text-primary-foreground'}>
@@ -399,10 +450,10 @@ export default function Index() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" size="icon" className="hover-scale">
+                <Button variant="ghost" size="icon" className="hover-scale hidden sm:flex">
                   <Icon name="Phone" size={20} />
                 </Button>
-                <Button variant="ghost" size="icon" className="hover-scale">
+                <Button variant="ghost" size="icon" className="hover-scale hidden sm:flex">
                   <Icon name="Video" size={20} />
                 </Button>
                 <Button variant="ghost" size="icon" className="hover-scale">
@@ -411,7 +462,7 @@ export default function Index() {
               </div>
             </header>
 
-            <ScrollArea className="flex-1 p-6 bg-background">
+            <ScrollArea className="flex-1 p-4 lg:p-6 bg-background">
               <div className="max-w-4xl mx-auto">
                 {messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full min-h-[400px] text-muted-foreground">
@@ -428,7 +479,7 @@ export default function Index() {
                         key={message.id}
                         className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'} animate-fade-in`}
                       >
-                        <div className={`max-w-[70%] ${message.isOwn ? 'order-2' : ''}`}>
+                        <div className={`max-w-[85%] sm:max-w-[70%] ${message.isOwn ? 'order-2' : ''}`}>
                           {!message.isOwn && (
                             <p className="text-xs text-muted-foreground mb-1 ml-2">{message.sender}</p>
                           )}
@@ -441,16 +492,17 @@ export default function Index() {
                               }
                             `}
                           >
-                            <p className="text-sm leading-relaxed">{message.text}</p>
+                            <p className="text-sm leading-relaxed break-words">{message.text}</p>
                             <span className={`text-[10px] mt-1 block ${message.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                               {message.time}
                             </span>
                             
                             {message.reactions.length > 0 && (
-                              <div className="absolute -bottom-3 left-2 flex gap-1">
+                              <div className="absolute -bottom-3 left-2 flex gap-1 flex-wrap">
                                 {message.reactions.map((emoji, idx) => (
                                   <span
                                     key={idx}
+                                    onClick={() => handleAddReaction(message.id, emoji)}
                                     className="bg-card border border-border rounded-full px-1.5 py-0.5 text-xs hover-scale cursor-pointer"
                                   >
                                     {emoji}
@@ -459,11 +511,30 @@ export default function Index() {
                               </div>
                             )}
 
-                            <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 smooth-transition">
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <Icon name="SmilePlus" size={16} />
-                              </Button>
-                            </div>
+                            <Popover open={reactionPopover === message.id} onOpenChange={(open) => setReactionPopover(open ? message.id : null)}>
+                              <PopoverTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="absolute -right-2 sm:-right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 smooth-transition h-7 w-7"
+                                >
+                                  <Icon name="SmilePlus" size={16} />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-2" align="end">
+                                <div className="flex gap-1">
+                                  {EMOJI_REACTIONS.map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => handleAddReaction(message.id, emoji)}
+                                      className="text-xl hover-scale smooth-transition p-1 hover:bg-accent rounded"
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       </div>
@@ -473,10 +544,10 @@ export default function Index() {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-border p-4 bg-card">
+            <div className="border-t border-border p-3 lg:p-4 bg-card">
               <div className="max-w-4xl mx-auto">
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" className="hover-scale">
+                  <Button variant="ghost" size="icon" className="hover-scale hidden sm:flex shrink-0">
                     <Icon name="Paperclip" size={20} />
                   </Button>
                   <div className="flex-1 relative">
@@ -484,7 +555,7 @@ export default function Index() {
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
                       placeholder="Написать сообщение..."
-                      className="pr-20"
+                      className="pr-16 sm:pr-20"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -496,20 +567,20 @@ export default function Index() {
                       <Button variant="ghost" size="icon" className="h-8 w-8">
                         <Icon name="Smile" size={18} />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex">
                         <Icon name="Mic" size={18} />
                       </Button>
                     </div>
                   </div>
-                  <Button onClick={handleSendMessage} className="px-6 hover-scale">
+                  <Button onClick={handleSendMessage} className="px-4 sm:px-6 hover-scale shrink-0">
                     <Icon name="Send" size={18} />
                   </Button>
                 </div>
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
                   {EMOJI_REACTIONS.map((emoji) => (
                     <button
                       key={emoji}
-                      className="text-lg hover-scale smooth-transition opacity-70 hover:opacity-100"
+                      className="text-lg hover-scale smooth-transition opacity-70 hover:opacity-100 shrink-0"
                       onClick={() => setMessageInput(messageInput + emoji)}
                     >
                       {emoji}
